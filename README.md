@@ -10,7 +10,7 @@ ssspm look <package> # looks for a package in the repo
 ```
 ## dependancys:
 - a C++ compiler
-- a C++ c ilbary
+- a C++ standard ilbary
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 - [libgit2](https://libgit2.org/)
 - [boost](https://www.boost.org/)
