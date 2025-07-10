@@ -12,6 +12,7 @@ ssspm look <package> # looks for a package in the repo
 - a C++ compiler
 - a C++ c ilbary
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
+- [libgit2](https://libgit2.org/)
 ## todo:
 - support for multiple repos
 - add a command for adding repos to the config
