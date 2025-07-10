@@ -13,6 +13,5 @@ ssspm look <package> # looks for a package in the repo
 - a C++ standard ilbary
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 - [libgit2](https://libgit2.org/)
-- [boost](https://www.boost.org/)
 ## todo:
 - finish the base system 
