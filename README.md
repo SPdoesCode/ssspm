@@ -14,5 +14,4 @@ ssspm look <package> # looks for a package in the repo
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 - [libgit2](https://libgit2.org/)
 ## todo:
-- support for multiple repos
-- add a command for adding repos to the config
+- finish the base system 
