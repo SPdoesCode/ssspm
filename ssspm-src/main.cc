@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <fstream>
 #include <git2.h>
+#include <sys/types.h>
+#include <limits.h>
 
 using namespace std;
 
@@ -63,10 +65,10 @@ void addGlobalPkg(string pkg); //
 void removeGlobalPkg(string pkg); //
 void updateGlobalPkgs(Global gbl, Config cfg); //
 
-void installPackage(Package pkg, Global gbl);
+void installPackage(Package pkg, Global gbl, Config cfg, bool depn);
 void uninstallPackage(Package pkg, Global gbl);
 
-void syncRepos(Config cfg);
+void syncRepos(Config cfg); //
 
 int main(int argc, char *argv[]) {
 
@@ -101,18 +103,22 @@ int main(int argc, char *argv[]) {
 	switch (act) {
 		case Install:
 			for (int i = 2; i < argc; i++) {
-				pkg = parsePkg(argv[i-1], cfg);
-				installPackage(pkg, gbl);
+				pkg = parsePkg(argv[i], cfg);
+				installPackage(pkg, gbl, cfg, false);
 			}
+			break;
 		case Remove:
 			for (int i = 2; i < argc; i++) {
-				pkg = parsePkg(argv[i-1], cfg);
+				pkg = parsePkg(argv[i], cfg);
 				uninstallPackage(pkg, gbl);
 			}
+			break;
 		case Update:
 			updateGlobalPkgs(gbl, cfg);
+			break;
 		case Sync:
 			syncRepos(cfg);
+			break;
 	}
 	
 	exit(0);
@@ -121,10 +127,13 @@ int main(int argc, char *argv[]) {
 void printPkgInfo(Global gbl, Package pkg, STYLE style) {
 	switch (style) {
 		case Inst:
-			cout << "Package: " << pkg.pkgname << " || Version: " << pkg.pkgver << "\nDependancys:";
+			cout << "Package: " << pkg.pkgname << "\nVersion: " << pkg.pkgver << "\nDependancys:";
 			for (string dep: pkg.deps) {
-				cout << "   - " << dep << "\n";
+				cout << "\n   - " << dep;
 			}
+			cout << "\n";
+			break;
+			
 		case Search:
 		
 			cout << "Package: " << pkg.pkgname << "\nVersion: " << pkg.pkgver << "\nAuthor: " << pkg.author << "\nDescription: " << pkg.desc << "\nSource: " << pkg.src << "\nState: ";
@@ -132,8 +141,10 @@ void printPkgInfo(Global gbl, Package pkg, STYLE style) {
 			switch (inGlobal(gbl, pkg.pkgname)) {
 				case Installed:
 					cout << "Installed";
+					break;
 				case Uninstalled:
 					cout << "Uninstalled";
+					break;
 			}
 
 			cout << "\nDependancys:";
@@ -141,6 +152,7 @@ void printPkgInfo(Global gbl, Package pkg, STYLE style) {
 			for (string dep: pkg.deps) {
 				cout << "   - " << dep << "\n";
 			}
+			break;
 	}
 }
 
@@ -292,7 +304,7 @@ Global parseGlobal(void) {
 
 PKGSTS inGlobal(Global gbl, string pkg) {
 
-	for (string pck: gbl.pkgs) {
+	for (const string&  pck: gbl.pkgs) {
 
 		if (pck == pkg) {
 			return Installed;
@@ -382,10 +394,10 @@ void updateGlobalPkgs(Global gbl, Config cfg) {
 
 	Package rpkg;
 	
-	for (string pkg: gbl.pkgs) {
+	for (const string& pkg: gbl.pkgs) {
 
 		rpkg = parsePkg(pkg, cfg);
-		installPackage(rpkg, gbl);
+		installPackage(rpkg, gbl, cfg, false);
 		
 	}
 	
@@ -393,7 +405,104 @@ void updateGlobalPkgs(Global gbl, Config cfg) {
 
 
 
-void installPackage(Package pkg, Global gbl);
+void installPackage(Package pkg, Global gbl, Config cfg, bool depn) {
+
+	string dodir = "/ssspm/build/"+pkg.pkgname;
+	string tmpdir = "/ssspm/tmp/"+pkg.pkgname;
+	string tardir = "/ssspm/tars/"+pkg.pkgname;
+	string buildsh = dodir+"/compile";
+	
+	
+	Package ipkg;
+
+	if (depn == false) {
+
+		string input;
+		
+		cout << "Going to install the following package and dependancys:\n";
+	
+		printPkgInfo(gbl, pkg, Inst);
+	
+		for (;;) {
+
+			cout << "Do you wish to continue? (Y/n) ";
+	
+			cin >> input;
+
+			if (input == "Y" || input == "y" || input.empty()) break;
+			else if (input == "N" || input == "n") exit(0);
+			else {
+				cout << "Invalid input: " << input << "\n";
+			}
+		
+		}
+	}
+	
+	for (const string& dep: pkg.deps) {
+
+		switch (inGlobal(gbl, dep)) {
+
+		case Uninstalled:
+			if (depn == false) cout << "Installing dependancy: " << dep << "\n";
+			else if (depn == true) cout << "Installing dependancy dependancy: " << dep << "\n";
+			ipkg = parsePkg(dep, cfg);
+			installPackage(ipkg, gbl, cfg, true);
+			break;
+		case Installed:
+			cout << dep << "is installed, skipping\n";
+			break;
+		}
+	}
+
+	cout << "Creating temp build dir\n";
+	
+	if (mkdir(dodir.c_str(), 0755)) {
+		cout << "Created temp build dir\n";
+	} else {
+		cout << "ERROR}: Failed to create directory!!\n";
+		exit(1);
+	}
+
+	if (mkdir(tmpdir.c_str(), 0755)) {
+		cout << "Created temp  dir\n";
+	} else {
+		cout << "ERROR}: Failed to create directory!!\n";
+		exit(1);
+	}
+	
+	ofstream outFile(buildsh);
+	if (!outFile) {
+		cout << "ERROR}: Couldnt make build script!!\n";
+	}
+
+	outFile << "#!/bin/sh \n";
+	outFile << "set -ex\n";
+	outFile << "cd \""+dodir+"\" || exit 1";
+	
+	for (const string& cmdi: pkg.install) {
+
+		outFile << cmdi << "\n";
+		
+	}
+
+	outFile.close();
+
+	if (chmod(buildsh.c_str(), 0755) != 0) { 
+
+		cout << "ERROR}: Couldnt chmod!!\n";
+		exit(0);
+	
+	}
+
+	string cmdtrue = buildsh+" \""+tmpdir+"\"";
+
+	cout << "Executing: " << cmdtrue << "\n";
+
+	system(cmdtrue);
+
+	
+	
+}
 
 void uninstallPackage(Package pkg, Global gbl);
 
